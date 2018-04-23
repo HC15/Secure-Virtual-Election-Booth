@@ -3,16 +3,23 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.security.InvalidKeyException;
+import java.security.KeyPair;
+import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
+import java.security.Signature;
+import java.security.SignatureException;
 
 public class VoterCli {
     private Socket client;
     private ClientUtil util;
+    private KeyPair clientKeys;
 
     private VoterCli(String serverDomain, int portNumber) {
         try {
             this.client = new Socket(serverDomain, portNumber);
             this.util = new ClientUtil();
+            this.clientKeys = this.util.getClientKeys();
         } catch (UnknownHostException ex) {
             ClientUtil.handleException(ex, "IP address of the host could not be determined");
         } catch (IOException ex) {
@@ -26,37 +33,47 @@ public class VoterCli {
         try {
             ObjectOutputStream clientOut = new ObjectOutputStream(this.client.getOutputStream());
             ObjectInputStream clientIn = new ObjectInputStream(this.client.getInputStream());
-            PublicKey vfPublicKey = (PublicKey) clientIn.readObject();
+            PublicKey serverPublicKey = this.util.getServerKey();
 
             String name = this.util.inputName();
-            String vnumber = this.util.inputNumber();
-            String voterinfo = name + ' ' + vnumber;
-            clientOut.writeObject(util.encrypt(vfPublicKey, voterinfo));
+            clientOut.writeObject(util.encrypt(serverPublicKey, name));
 
-            short response = clientIn.readShort();
-            if (response == 1) {
-                String action;
+            Signature nameSig = Signature.getInstance("SHA1withRSA");
+            nameSig.initSign(this.clientKeys.getPrivate());
+            nameSig.update(name.getBytes());
+            clientOut.write(nameSig.sign());
+
+            String vnumber = this.util.inputVnumber();
+            clientOut.writeObject(util.encrypt(serverPublicKey, vnumber));
+            
+            if (clientIn.readShort() == 1) {
+                Short action = this.util.menu(name);
+/*
                 do {
                     action = this.util.menu(name);
-                    clientOut.writeShort(Short.parseShort(action));
-                    if (action.equals("1")) {
+                    clientOut.writeShort(action);
+                    if (action == 1) {
 
-                    } else if (action.equals("2")) {
+                    } else if (action == 2) {
 
-                    } else if (action.equals("3")) {
+                    } else if (action == 3)
 
-                    } else if (action.equals("4")) {
+                    } else if (action == 4) {
                         System.out.println("Voter client will now terminate");
                     }
-                } while (!action.equals("4"));
-
+                } while (action != 4);
+*/
             } else {
                 System.out.println("Invalid name or registration number");
             }
         } catch (IOException ex) {
             ClientUtil.handleException(ex, "I/O error occurred while client was running");
-        } catch (ClassNotFoundException ex) {
-            System.exit(1);
+        } catch (NoSuchAlgorithmException ex) {
+            ClientUtil.handleException(ex, "No such signature algorithm");
+        } catch (InvalidKeyException ex) {
+            ClientUtil.handleException(ex, "Invalid key for signature signing");
+        } catch (SignatureException ex) {
+            ClientUtil.handleException(ex, "Signature object not initialized properly");
         }
     }
 

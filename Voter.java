@@ -1,26 +1,24 @@
+import java.time.Clock;
+
 public class Voter {
-    private String voterinfo;
+    private String name;
+    private String vnumber;
     private boolean voted;
     private String voteTime;
 
-    public Voter(String voterinfoIn) {
-        this.voterinfo = voterinfoIn;
+    public Voter(String nameIn, String vnumberIn) {
+        this.name = nameIn;
+        this.vnumber = vnumberIn;
         this.voted = false;
         this.voteTime = "";
     }
 
-    public String getVoterinfo() {
-        return this.voterinfo;
-    }
-
     public String getName() {
-        String name = new String();
-        return name;
+        return this.name;
     }
 
-    public String getNumber() {
-        String vnumber = new String();
-        return vnumber;
+    public String getVnumber() {
+        return this.vnumber;
     }
 
     public boolean getVoted() {
@@ -36,11 +34,10 @@ public class Voter {
     }
 
     public void setVoteTime() {
-        //this.voteTime = Clock.systemUTC().instant().toString();
-        this.voteTime = "1";
+        this.voteTime = Clock.systemUTC().instant().toString();
     }
 
-    public void setVoteTime(String voteTime) {
-        this.voteTime = voteTime;
+    public void setVoteTime(String voteTimeIn) {
+        this.voteTime = voteTimeIn;
     }
 }

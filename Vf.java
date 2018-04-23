@@ -1,4 +1,3 @@
-import javax.crypto.SealedObject;
 import java.io.InvalidClassException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -7,23 +6,29 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.security.InvalidKeyException;
 import java.security.KeyPair;
+import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
+import java.security.Signature;
+import java.security.SignatureException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import javax.crypto.SealedObject;
 
 public class Vf {
     private ServerSocket listen;
     private ServerUtil util;
-    private KeyPair keys;
+    private KeyPair serverKeys;
     private ArrayList<Voter> voters;
     private HashMap<String,Integer> result;
 
     private Vf(int portNumber) {
         try {
-            this.listen = new ServerSocket(portNumber);
+            this.listen = new ServerSocket(portNumber, 10);
             this.listen.setSoTimeout(300000); // Set server to timeout if no input in 5 minutes
             this.util = new ServerUtil();
-            this.keys = this.util.getKeyPair();
+            this.serverKeys = this.util.getServerKeys();
             this.voters = this.util.getVoters();
             this.result = this.util.getResult();
         } catch (SocketException ex) {
@@ -41,24 +46,51 @@ public class Vf {
                 Socket connect = this.listen.accept();
                 ObjectOutputStream serverOut = new ObjectOutputStream(connect.getOutputStream());
                 ObjectInputStream serverIn = new ObjectInputStream(connect.getInputStream());
+                PublicKey clientKey = this.util.getClientKey();
 
-                serverOut.writeObject(this.keys.getPublic());
-                SealedObject encryptedVoterinfo = (SealedObject) serverIn.readObject();
-                String voterinfo = (String) this.util.decrypt(this.keys.getPrivate(), encryptedVoterinfo);
+                SealedObject nameEncrypted = (SealedObject) serverIn.readObject();
+                String name = (String) this.util.decrypt(this.serverKeys.getPrivate(), nameEncrypted);
+
+                byte[] nameSigBytes = new byte[256];
+                serverIn.readFully(nameSigBytes);
+                Signature nameSig = Signature.getInstance("SHA1withRSA");
+                nameSig.initVerify(clientKey);
+                nameSig.update(name.getBytes());
+
+                SealedObject vnumberEncrypted = (SealedObject) serverIn.readObject();
+                String vnumber = (String) this.util.decrypt(this.serverKeys.getPrivate(), vnumberEncrypted);
 
                 Voter current = this.voters.get(0);
                 boolean matches = false;
-                for (Voter voter : this.voters) {
-                    if (voter.getVoterinfo().equals(voterinfo)) {
-                        current = voter;
-                        matches = true;
-                        break;
+                if (nameSig.verify(nameSigBytes)) {
+                    for (Voter voter : this.voters) {
+                        if (voter.getName().equals(name) && voter.getVnumber().equals(vnumber)) {
+                            current = voter;
+                            matches = true;
+                            break;
+                        }
                     }
+                } else {
+                    System.out.println("Digital Signature didn't verify correctly");
                 }
 
                 if (matches) {
                     serverOut.writeShort(1);
-                    short action = serverIn.readShort();
+/*
+                    short action = -1;
+                    do {
+                        action = serverIn.readShort();
+                        if (action == 1) {
+
+                        } else if (action == 2) {
+
+                        } else if (action == 3) {
+
+                        } else if (action == 4) {
+
+                        }
+                    } while (action != 4);
+*/
                 } else {
                     serverOut.writeShort(0);
                 }
@@ -72,12 +104,16 @@ public class Vf {
                 break;
             } catch (NullPointerException ex) {
                 ServerUtil.handleException(ex, "Input or output stream can't be null");
-            } catch (InvalidClassException ex) {
-                ServerUtil.handleException(ex, "Something is wrong with class used by serialization");
-            } catch (ClassNotFoundException ex) {
-                ServerUtil.handleException(ex, "Class of a serialized object cannot be found");
             } catch (IOException ex) {
                 ServerUtil.handleException(ex, "I/O error occurred when opening, closing, or using connection socket");
+            } catch (ClassNotFoundException ex) {
+                ServerUtil.handleException(ex, "Class of a serialized object cannot be found");
+            } catch (NoSuchAlgorithmException ex) {
+                ClientUtil.handleException(ex, "No such signature algorithm");
+            } catch (InvalidKeyException ex) {
+                ServerUtil.handleException(ex, "Invalid key for signature verification");
+            } catch (SignatureException ex) {
+                ClientUtil.handleException(ex, "Signature object not initialized properly");
             }
         }
     }
