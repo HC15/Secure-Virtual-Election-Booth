@@ -2,12 +2,11 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.InvalidPathException;
 import java.security.InvalidKeyException;
 import java.security.InvalidParameterException;
 import java.security.Key;
@@ -61,7 +60,7 @@ class ServerUtil {
         } catch (FileNotFoundException ex) {
             handleException(ex, "Name exist but is directory, does not exist and can't be created, or can't be opened");
         } catch (IOException ex) {
-            handleException(ex, "I/O Error occurred while writing to or closing key files");
+            handleException(ex, "I/O Error occurred while writing or closing server key files");
         }
         return null;
     }
@@ -84,38 +83,36 @@ class ServerUtil {
             }
             resultFile.close();
         } catch (IOException ex) {
-            handleException(ex, "I/O Error occurred while writing to or closing result file");
+            handleException(ex, "I/O Error occurred while writing or closing result file");
         }
     }
 
     KeyPair getServerKeys() {
         try {
-            File publicKeyFile = new File("server_public.key");
-            File privateKeyFile = new File("server_private.key");
-            if ((publicKeyFile.exists() && publicKeyFile.canRead()) &&
-                    (privateKeyFile.exists() && privateKeyFile.canRead())) {
-                KeyFactory factory = KeyFactory.getInstance("RSA");
+            KeyFactory factory = KeyFactory.getInstance("RSA");
 
-                byte[] publicKeyByte = Files.readAllBytes(publicKeyFile.toPath());
-                X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(publicKeyByte);
-                PublicKey publicKey = factory.generatePublic(publicKeySpec);
+            FileInputStream publicKeyFile = new FileInputStream("server_public.key");
+            byte[] publicKeyByte = new byte[publicKeyFile.available()];
+            publicKeyFile.read(publicKeyByte);
+            publicKeyFile.close();
+            X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(publicKeyByte);
+            PublicKey publicKey = factory.generatePublic(publicKeySpec);
 
+            FileInputStream privateKeyFile = new FileInputStream("server_private.key");
+            byte[] privateKeyByte = new byte[privateKeyFile.available()];
+            privateKeyFile.read(privateKeyByte);
+            privateKeyFile.close();
+            PKCS8EncodedKeySpec privateKeySpec = new PKCS8EncodedKeySpec(privateKeyByte);
+            PrivateKey privateKey = factory.generatePrivate(privateKeySpec);
 
-                byte[] privateKeyByte = Files.readAllBytes(privateKeyFile.toPath());
-                PKCS8EncodedKeySpec privateKeySpec = new PKCS8EncodedKeySpec(privateKeyByte);
-                PrivateKey privateKey = factory.generatePrivate(privateKeySpec);
-
-                return new KeyPair(publicKey, privateKey);
-            } else {
-                System.out.println("Server key files not found, generating keys and saving to files");
-                return this.createServerKeys();
-            }
+            return new KeyPair(publicKey, privateKey);
         } catch (NoSuchAlgorithmException ex) {
             handleException(ex, "No such key generator algorithm");
-        } catch (InvalidPathException ex) {
-            handleException(ex, "Path object cannot be constructed from abstract path");
+        } catch (FileNotFoundException ex) {
+            System.out.println("Server key files not found, generating keys and saving to files");
+            return this.createServerKeys();
         } catch (IOException ex) {
-            handleException(ex, "I/O Error occurred while reading from server key files");
+            handleException(ex, "I/O Error occurred while reading or closing server key files");
         } catch (InvalidKeySpecException ex) {
             handleException(ex, "Given key specification is inappropriate for this key factory");
         }
@@ -124,22 +121,19 @@ class ServerUtil {
 
     PublicKey getClientKey() {
         try {
-            File publicKeyFile = new File("client_public.key");
-            if (publicKeyFile.exists() && publicKeyFile.canRead()) {
-                KeyFactory factory = KeyFactory.getInstance("RSA");
-                byte[] publicKeyByte = Files.readAllBytes(publicKeyFile.toPath());
-                X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(publicKeyByte);
-                return factory.generatePublic(publicKeySpec);
-            } else {
-                System.out.println("Client public key file not found, run client to generate key");
-                System.exit(1);
-            }
+            KeyFactory factory = KeyFactory.getInstance("RSA");
+            FileInputStream publicKeyFile = new FileInputStream("client_public.key");
+            byte[] publicKeyByte = new byte[publicKeyFile.available()];
+            publicKeyFile.read(publicKeyByte);
+            publicKeyFile.close();
+            X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(publicKeyByte);
+            return factory.generatePublic(publicKeySpec);
         } catch (NoSuchAlgorithmException ex) {
             handleException(ex, "No such key generator algorithm");
-        } catch (InvalidPathException ex) {
-            handleException(ex, "Path object cannot be constructed from abstract path");
+        } catch (FileNotFoundException ex) {
+            handleException(ex, "Client public key file not found, run client to generate key");
         } catch (IOException ex) {
-            handleException(ex, "I/O Error occurred while reading from server key files");
+            handleException(ex, "I/O Error occurred while reading or closing client public key file");
         } catch (InvalidKeySpecException ex) {
             handleException(ex, "Given key specification is inappropriate for this key factory");
         }

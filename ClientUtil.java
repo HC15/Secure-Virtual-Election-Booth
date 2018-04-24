@@ -1,6 +1,7 @@
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.io.IOException;
@@ -59,38 +60,37 @@ class ClientUtil {
         } catch (FileNotFoundException ex) {
             handleException(ex, "Name exist but is directory, does not exist and can't be created, or can't be opened");
         } catch (IOException ex) {
-            handleException(ex, "I/O Error occurred while writing or closing key files");
+            handleException(ex, "I/O Error occurred while writing or closing client key files");
         }
         return null;
     }
 
     KeyPair getClientKeys() {
         try {
-            File publicKeyFile = new File("client_public.key");
-            File privateKeyFile = new File("client_private.key");
-            if ((publicKeyFile.exists() && publicKeyFile.canRead()) &&
-                    (privateKeyFile.exists() && privateKeyFile.canRead())) {
-                KeyFactory factory = KeyFactory.getInstance("RSA");
+            KeyFactory factory = KeyFactory.getInstance("RSA");
 
-                byte[] publicKeyByte = Files.readAllBytes(publicKeyFile.toPath());
-                X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(publicKeyByte);
-                PublicKey publicKey = factory.generatePublic(publicKeySpec);
+            FileInputStream publicKeyFile = new FileInputStream("client_public.key");
+            byte[] publicKeyByte = new byte[publicKeyFile.available()];
+            publicKeyFile.read(publicKeyByte);
+            publicKeyFile.close();
+            X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(publicKeyByte);
+            PublicKey publicKey = factory.generatePublic(publicKeySpec);
 
-                byte[] privateKeyByte = Files.readAllBytes(privateKeyFile.toPath());
-                PKCS8EncodedKeySpec privateKeySpec = new PKCS8EncodedKeySpec(privateKeyByte);
-                PrivateKey privateKey = factory.generatePrivate(privateKeySpec);
+            FileInputStream privateKeyFile = new FileInputStream("client_private.key");
+            byte[] privateKeyByte = new byte[privateKeyFile.available()];
+            privateKeyFile.read(privateKeyByte);
+            privateKeyFile.close();
+            PKCS8EncodedKeySpec privateKeySpec = new PKCS8EncodedKeySpec(privateKeyByte);
+            PrivateKey privateKey = factory.generatePrivate(privateKeySpec);
 
-                return new KeyPair(publicKey, privateKey);
-            } else {
-                System.out.println("Client key files not found, generating keys and saving to files");
-                return this.createClientKeys();
-            }
+            return new KeyPair(publicKey, privateKey);
         } catch (NoSuchAlgorithmException ex) {
             handleException(ex, "No such key generator algorithm");
-        } catch (InvalidPathException ex) {
-            handleException(ex, "Path object cannot be constructed from abstract path");
+        } catch (FileNotFoundException ex) {
+            System.out.println("Client key files not found, generating keys and saving to files");
+            return this.createClientKeys();
         } catch (IOException ex) {
-            handleException(ex, "I/O Error occurred while reading from server key files");
+            handleException(ex, "I/O Error occurred while reading or closing client key files");
         } catch (InvalidKeySpecException ex) {
             handleException(ex, "Given key specification is inappropriate for this key factory");
         }
@@ -99,22 +99,19 @@ class ClientUtil {
 
     PublicKey getServerKey() {
         try {
-            File publicKeyFile = new File("server_public.key");
-            if (publicKeyFile.exists() && publicKeyFile.canRead()) {
-                KeyFactory factory = KeyFactory.getInstance("RSA");
-                byte[] publicKeyByte = Files.readAllBytes(publicKeyFile.toPath());
-                X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(publicKeyByte);
-                return factory.generatePublic(publicKeySpec);
-            } else {
-                System.err.println("Server public key file not found, run server to generate key");
-                System.exit(1);
-            }
+            KeyFactory factory = KeyFactory.getInstance("RSA");
+            FileInputStream publicKeyFile = new FileInputStream("server_public.key");
+            byte[] publicKeyByte = new byte[publicKeyFile.available()];
+            publicKeyFile.read(publicKeyByte);
+            publicKeyFile.close();
+            X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(publicKeyByte);
+            return factory.generatePublic(publicKeySpec);
         } catch (NoSuchAlgorithmException ex) {
             handleException(ex, "No such key generator algorithm");
-        } catch (InvalidPathException ex) {
-            handleException(ex, "Path object cannot be constructed from abstract path");
+        } catch (FileNotFoundException ex) {
+            handleException(ex, "Server public key file not found, run server to generate key");
         } catch (IOException ex) {
-            handleException(ex, "I/O Error occurred while reading from server public key file");
+            handleException(ex, "I/O Error occurred while reading or closing server public key file");
         } catch (InvalidKeySpecException ex) {
             handleException(ex, "Given key specification is inappropriate for this key factory");
         }
