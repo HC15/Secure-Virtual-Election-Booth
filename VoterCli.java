@@ -36,33 +36,40 @@ public class VoterCli {
             PublicKey serverPublicKey = this.util.getServerKey();
 
             String name = this.util.inputName();
-            clientOut.writeObject(util.encrypt(serverPublicKey, name));
+            String vnumber = this.util.inputVnumber();
 
-            Signature nameSig = Signature.getInstance("SHA1withRSA");
+            Signature nameSig = Signature.getInstance("SHA256withRSA");
             nameSig.initSign(this.clientKeys.getPrivate());
             nameSig.update(name.getBytes());
-            clientOut.write(nameSig.sign());
 
-            String vnumber = this.util.inputVnumber();
-            clientOut.writeObject(util.encrypt(serverPublicKey, vnumber));
-            
+            clientOut.writeObject(this.util.encrypt(serverPublicKey, name));
+            clientOut.flush();
+            clientOut.writeObject(this.util.encrypt(serverPublicKey, vnumber));
+            clientOut.flush();
+            clientOut.write(nameSig.sign());
+            clientOut.flush();
+
             if (clientIn.readShort() == 1) {
-                Short action = this.util.menu(name);
-/*
+                Short action;
                 do {
+                    System.out.println();
                     action = this.util.menu(name);
                     clientOut.writeShort(action);
+                    clientOut.flush();
                     if (action == 1) {
-
+                        if (clientIn.readShort() == 1) {
+                            System.out.println("You haven't voted");
+                        } else {
+                            System.out.println("You have already voted");
+                        }
                     } else if (action == 2) {
-
-                    } else if (action == 3)
-
+                        System.out.println(2);
+                    } else if (action == 3) {
+                        System.out.println(3);
                     } else if (action == 4) {
                         System.out.println("Voter client will now terminate");
                     }
                 } while (action != 4);
-*/
             } else {
                 System.out.println("Invalid name or registration number");
             }
@@ -87,7 +94,7 @@ public class VoterCli {
 
     public static void main(String[] args) {
         String serverDomain = args[0];
-        int portNumber = 0;
+        int portNumber = -1;
         try {
             portNumber = Integer.parseInt(args[1]);
         } catch (NumberFormatException ex) {

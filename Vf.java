@@ -1,4 +1,3 @@
-import java.io.InvalidClassException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -21,7 +20,7 @@ public class Vf {
     private ServerUtil util;
     private KeyPair serverKeys;
     private ArrayList<Voter> voters;
-    private HashMap<String,Integer> result;
+    private HashMap<String, Integer> result;
 
     private Vf(int portNumber) {
         try {
@@ -49,16 +48,16 @@ public class Vf {
                 PublicKey clientKey = this.util.getClientKey();
 
                 SealedObject nameEncrypted = (SealedObject) serverIn.readObject();
-                String name = (String) this.util.decrypt(this.serverKeys.getPrivate(), nameEncrypted);
-
+                SealedObject vnumberEncrypted = (SealedObject) serverIn.readObject();
                 byte[] nameSigBytes = new byte[256];
                 serverIn.readFully(nameSigBytes);
-                Signature nameSig = Signature.getInstance("SHA1withRSA");
+
+                String name = (String) this.util.decrypt(this.serverKeys.getPrivate(), nameEncrypted);
+                String vnumber = (String) this.util.decrypt(this.serverKeys.getPrivate(), vnumberEncrypted);
+
+                Signature nameSig = Signature.getInstance("SHA256withRSA");
                 nameSig.initVerify(clientKey);
                 nameSig.update(name.getBytes());
-
-                SealedObject vnumberEncrypted = (SealedObject) serverIn.readObject();
-                String vnumber = (String) this.util.decrypt(this.serverKeys.getPrivate(), vnumberEncrypted);
 
                 Voter current = this.voters.get(0);
                 boolean matches = false;
@@ -71,26 +70,30 @@ public class Vf {
                         }
                     }
                 } else {
-                    System.out.println("Digital Signature didn't verify correctly");
+                    System.out.println("Digital Signature did not verify correctly");
                 }
 
                 if (matches) {
                     serverOut.writeShort(1);
-/*
-                    short action = -1;
+                    serverOut.flush();
+
+                    Short action;
                     do {
                         action = serverIn.readShort();
                         if (action == 1) {
-
+                            if (current.getVoted()) {
+                                serverOut.writeShort(0);
+                                serverOut.flush();
+                            } else {
+                                serverOut.writeShort(1);
+                                serverOut.flush();
+                            }
                         } else if (action == 2) {
-
+                            System.out.println(2);
                         } else if (action == 3) {
-
-                        } else if (action == 4) {
-
+                            System.out.println(3);
                         }
                     } while (action != 4);
-*/
                 } else {
                     serverOut.writeShort(0);
                 }

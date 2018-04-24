@@ -1,12 +1,7 @@
-import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
-import javax.crypto.SealedObject;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.InputStreamReader;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -23,7 +18,10 @@ import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
-import java.util.ArrayList;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SealedObject;
 
 class ClientUtil {
     private BufferedReader userInput;
@@ -57,11 +55,11 @@ class ClientUtil {
         } catch (NoSuchAlgorithmException ex) {
             handleException(ex, "No such key pair generator algorithm");
         } catch (InvalidParameterException ex) {
-            handleException(ex, "Incorrect key size, wrong or not supported");
+            handleException(ex, "Invalid key size, wrong or not supported");
         } catch (FileNotFoundException ex) {
             handleException(ex, "Name exist but is directory, does not exist and can't be created, or can't be opened");
         } catch (IOException ex) {
-            handleException(ex, "I/O Error occurred while writing to or closing key files");
+            handleException(ex, "I/O Error occurred while writing or closing key files");
         }
         return null;
     }
@@ -108,7 +106,7 @@ class ClientUtil {
                 X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(publicKeyByte);
                 return factory.generatePublic(publicKeySpec);
             } else {
-                System.out.println("Server public key file not found, run server to generate key");
+                System.err.println("Server public key file not found, run server to generate key");
                 System.exit(1);
             }
         } catch (NoSuchAlgorithmException ex) {
@@ -116,28 +114,11 @@ class ClientUtil {
         } catch (InvalidPathException ex) {
             handleException(ex, "Path object cannot be constructed from abstract path");
         } catch (IOException ex) {
-            handleException(ex, "I/O Error occurred while reading from server key files");
+            handleException(ex, "I/O Error occurred while reading from server public key file");
         } catch (InvalidKeySpecException ex) {
             handleException(ex, "Given key specification is inappropriate for this key factory");
         }
         return null;
-    }
-
-    ArrayList<String> getCandidates() {
-        ArrayList<String> candidates = new ArrayList<String>();
-        String line;
-        try {
-            BufferedReader candidateinfoFile = new BufferedReader(new FileReader("candidateinfo"));
-            while ((line = candidateinfoFile.readLine()) != null && !line.trim().isEmpty()) {
-                candidates.add(line);
-            }
-            candidateinfoFile.close();
-        } catch (FileNotFoundException ex) {
-            handleException(ex, "No candidate info since file not found, add file named 'candidateinfo'");
-        } catch (IOException ex) {
-            handleException(ex, "Error when reading lines from the candidateinfo file or from closing file");
-        }
-        return candidates;
     }
 
     private boolean invalidName(String name) {
@@ -179,17 +160,17 @@ class ClientUtil {
 
     String inputVnumber() {
         String vnumber = new String();
-        try {
-            do {
-                System.out.print("Enter voter registration number: ");
+        do {
+            System.out.print("Enter voter registration number: ");
+            try {
                 vnumber = this.userInput.readLine();
-                if (this.invalidVnumber(vnumber)) {
-                    System.out.println("Invalid voter registration number");
-                }
-            } while (this.invalidVnumber(vnumber));
-        } catch (IOException ex) {
-            handleException(ex, "I/O error occurred while inputting voter registration number");
-        }
+            } catch (IOException ex) {
+                handleException(ex, "I/O error occurred while inputting voter registration number");
+            }
+            if (this.invalidVnumber(vnumber)) {
+                System.out.println("Invalid voter registration number, must be number with 9 digits");
+            }
+        } while (this.invalidVnumber(vnumber));
         return vnumber;
     }
 
@@ -207,10 +188,10 @@ class ClientUtil {
             try {
                 action = this.userInput.readLine();
             } catch (IOException ex) {
-                handleException(ex, "");
+                handleException(ex, "I/O error occurred while inputting action to menu");
             }
             if (this.invalidAction(action)) {
-                System.out.println("Invalid action, must be 1, 2, 3, or 4\n");
+                System.out.println("Invalid action, must be number (1-4)\n");
             }
         } while (this.invalidAction(action));
         return Short.parseShort(action);
